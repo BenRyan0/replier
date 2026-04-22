@@ -1,0 +1,90 @@
+{                                                                                                                                                                                                  
+    "replyPlaybook": {                                                                                                                                                                               
+      "playbook": "Lunalend Reply Playbook v4",                                                                                                                                                      
+      "total_categories": 7,                                                                                                                                                                         
+      "total_sub_variants": 29,                             
+      "auto_reply_blocked": ["not_interested__optout", "not_interested__hostile"],
+      "categories": [
+        {
+          "id": "stated_amount",
+          "label": "Lead gave a dollar figure",
+          "sub_variants": [
+            { "id": "primary",  "label": "Single mid-range amount ($2k to $49k)" },
+            { "id": "range",    "label": "Lead gave a range (e.g. 10k to 15k)" },
+            { "id": "small",    "label": "Amount under $2,000" },
+            { "id": "large",    "label": "Amount $50,000 or more" },
+            { "id": "unclear",  "label": "Wants max or amount implied but not stated" }
+          ]
+        },
+        {
+          "id": "interested",
+          "label": "Yes / send details / want to learn more",
+          "sub_variants": [
+            { "id": "primary",        "label": "Yes with no specific amount mentioned" },
+            { "id": "revenue_short",  "label": "Interested but flagged they may not hit $8K/month" },
+            { "id": "no_statements",  "label": "Interested but missing or incomplete bank statements" }
+          ]
+        },
+        {
+          "id": "needs_more_info",
+          "label": "Wants details before committing",
+          "sub_variants": [
+            { "id": "primary",       "label": "Generic send info or tell me more" },
+            { "id": "grant",         "label": "Asking if this is a grant or free money" },
+            { "id": "nonprofit",     "label": "Lead identified as nonprofit, church, charity, or 501c3" },
+            { "id": "next_steps",    "label": "Asking what happens after they apply or send statements" },
+            { "id": "no_statements", "label": "No bank statements or very short history" },
+            { "id": "phone_call",    "label": "Wants to talk on the phone or zoom before proceeding" },
+            { "id": "verify_legit",  "label": "Interested but wants to verify legitimacy first" }
+          ]
+        },
+        {
+          "id": "asking_questions",
+          "label": "Specific questions needing specific answers",
+          "sub_variants": [
+            { "id": "legitimacy",      "label": "Is this real, is this a scam, how do I know" },
+            { "id": "rate_skepticism", "label": "Rates sound too good, what is the catch, nobody lends that cheap" },
+            { "id": "how_got_info",    "label": "How did you get my number or email or information" },
+            { "id": "credit_concern",  "label": "I have bad credit or what does my credit score need to be" },
+            { "id": "why_pull_credit", "label": "Why do you need to pull credit if it does not matter" },
+            { "id": "product_type",    "label": "Is this a term loan or line of credit, what kind of funding" },
+            { "id": "location_banks",  "label": "Where are you based, what banks do you accept, US only" },
+            { "id": "rates_terms",     "label": "What are your rates, what are the terms, what is the APR" },
+            { "id": "documents",       "label": "Personal statements, what documents do you need" }
+          ]
+        },
+        {
+          "id": "completed_application",
+          "label": "Already submitted the application",
+          "sub_variants": [
+            { "id": "primary",     "label": "Confirmed they submitted, no further questions" },
+            { "id": "timing",      "label": "Submitted and asking when they will hear back" },
+            { "id": "with_amount", "label": "Submitted and also stated a dollar amount" }
+          ]
+        },
+        {
+          "id": "not_interested",
+          "label": "Declined, no thanks",
+          "sub_variants": [
+            { "id": "primary",         "label": "Polite decline with no specific reason"              },
+            { "id": "startup",         "label": "Declining because revenue too low or business too new" },
+            { "id": "grants",          "label": "Looking for grants not loans"                         },
+            { "id": "optout",          "label": "Asking to be removed or stop emailing"               },
+            { "id": "hostile",         "label": "Hostile, abusive, or slur-laden message"              },
+            { "id": "scam_accusation", "label": "Calling the outreach a scam"                        }
+          ]
+        },
+        {
+          "id": "irrelevant",
+          "label": "Off-topic, confused, or unclear",
+          "sub_variants": [
+            { "id": "primary",    "label": "Off-topic with no loan context, cannot determine intent" },
+            { "id": "confused",   "label": "Asking what we do or thinks they spoke to us before" },
+            { "id": "rambling",   "label": "Gave lots of unrelated business details" },
+            { "id": "non_us",     "label": "Business not in the US" },
+            { "id": "low_revenue","label": "Stated they do not hit $8K/month with no clear interest" }
+          ]
+        }
+      ]
+    }
+  }

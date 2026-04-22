@@ -425,5 +425,9 @@ export function toHtml(text) {
     .split('\n\n')
     .map(para => `<p>${para.replace(/\n/g, '<br>')}</p>`)
     .join('\n')
-    .replace(URL_RE, url => `<a href="${url}" target="_blank">${url}</a>`);
+    .replace(URL_RE, url => {
+      const clean = url.replace(/[.,;:!?)]+$/, '');
+      const tail  = url.slice(clean.length);
+      return `<a href="${clean}" target="_blank">${clean}</a>${tail}`;
+    });
 }

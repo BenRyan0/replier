@@ -71,6 +71,18 @@ async function _receiveReply(req, res) {
     return res.status(200).json({ success: true, skipped: true, reason: 'auto_reply_allowed is false' });
   }
 
+  // Dedup: if a resolved record exists for this lead+campaign, the conversation
+  // is closed — do not send another auto-reply.
+  try {
+    const resolved = await AutoReplyRecord.findOne({ lead_email, campaign_id, isResolved: true }).lean();
+    if (resolved) {
+      console.log(`  [skip] resolved AutoReplyRecord exists for lead=${lead_email} campaign=${campaign_id}`);
+      return res.status(200).json({ success: true, skipped: true, reason: 'lead already resolved' });
+    }
+  } catch (err) {
+    console.warn(`  [dedup] lookup error: ${err.message} — proceeding`);
+  }
+
   // Personalization vars
   const name    = sheetData['Lead First Name'];
   const company = extractCompany(sheetData);
