@@ -47,6 +47,17 @@ function validateBody(body) {
 
 export async function receiveReply(req, res) {
   try {
+    if (Array.isArray(req.body)) {
+      if (req.body.length === 0) {
+        return res.status(400).json({ success: false, error: 'Request array is empty' });
+      }
+      const results = await Promise.all(
+        req.body.map((item, i) => _processItem(item, i))
+      );
+      const allFailed = results.every(r => !r.success && r.status >= 500);
+      const statusCode = allFailed ? 500 : 200;
+      return res.status(statusCode).json(results);
+    }
     return await _receiveReply(req, res);
   } catch (err) {
     console.error(`  [500] unhandled exception — ${err.stack || err.message}`);
@@ -54,21 +65,43 @@ export async function receiveReply(req, res) {
   }
 }
 
+async function _processItem(body, index) {
+  const label = `[item ${index}]`;
+  try {
+    const result = await _handlePayload(body, label);
+    return result;
+  } catch (err) {
+    console.error(`  ${label} [500] unhandled exception — ${err.stack || err.message}`);
+    return { success: false, status: 500, error: `Unhandled error: ${err.message}` };
+  }
+}
+
 async function _receiveReply(req, res) {
   console.log("req.body---------------------")
   console.log(req.body)
-  const validationError = validateBody(req.body);
+  const result = await _handlePayload(req.body, '');
+  return res.status(result.status).json(
+    result.status === 200
+      ? (result.skipped ? { success: true, skipped: true, reason: result.reason } : { success: true })
+      : { success: false, error: result.error }
+  );
+}
+
+async function _handlePayload(body, label) {
+  const p = label ? `  ${label}` : ' ';
+
+  const validationError = validateBody(body);
   if (validationError) {
-    return res.status(400).json({ success: false, error: validationError });
+    return { success: false, status: 400, error: validationError };
   }
 
-  const { replyData, classification, sheetData, meta = {} } = req.body;
+  const { replyData, classification, sheetData, meta = {} } = body;
   const { lead_email, email_account, email_id, reply_subject, campaign_id } = replyData;
   const { category_id, sub_variant_id, auto_reply_allowed, extracted = {} } = classification;
 
   if (!auto_reply_allowed) {
-    console.log(`  [skip] auto_reply_allowed=false for ${category_id}__${sub_variant_id}`);
-    return res.status(200).json({ success: true, skipped: true, reason: 'auto_reply_allowed is false' });
+    console.log(`${p} [skip] auto_reply_allowed=false for ${category_id}__${sub_variant_id}`);
+    return { success: true, status: 200, skipped: true, reason: 'auto_reply_allowed is false' };
   }
 
   // Dedup: if a resolved record exists for this lead+campaign, the conversation
@@ -76,32 +109,26 @@ async function _receiveReply(req, res) {
   try {
     const resolved = await AutoReplyRecord.findOne({ lead_email, campaign_id, isResolved: true }).lean();
     if (resolved) {
-      console.log(`  [skip] resolved AutoReplyRecord exists for lead=${lead_email} campaign=${campaign_id}`);
-      return res.status(200).json({ success: true, skipped: true, reason: 'lead already resolved' });
+      console.log(`${p} [skip] resolved AutoReplyRecord exists for lead=${lead_email} campaign=${campaign_id}`);
+      return { success: true, status: 200, skipped: true, reason: 'lead already resolved' };
     }
   } catch (err) {
-    console.warn(`  [dedup] lookup error: ${err.message} — proceeding`);
+    console.warn(`${p} [dedup] lookup error: ${err.message} — proceeding`);
   }
 
-  // Personalization vars
   const name    = sheetData['Lead First Name'];
   const company = extractCompany(sheetData);
   const amount  = extracted.amount || extracted.value || '';
-  console.log(`  [personalization] name="${name}" company="${company}" amount="${amount}"`);
+  console.log(`${p} [personalization] name="${name}" company="${company}" amount="${amount}"`);
 
-  // Template lookup
   const plainText = renderTemplate(category_id, sub_variant_id, { name, company, amount });
   if (!plainText) {
-    console.error(`  [500] template not found — key="${category_id}__${sub_variant_id}"`);
-    return res.status(500).json({
-      success: false,
-      error: `Template not found for ${category_id}/${sub_variant_id}`,
-    });
+    console.error(`${p} [500] template not found — key="${category_id}__${sub_variant_id}"`);
+    return { success: false, status: 500, error: `Template not found for ${category_id}/${sub_variant_id}` };
   }
 
   const bodyHtml = toHtml(plainText);
 
-  // Tenant lookup — get Instantly API key + googleSheetId for AutoReplyRecord
   let instantlyApiKey = process.env.INSTANTLY_API_KEY || '';
   let googleSheetId   = '';
 
@@ -111,22 +138,21 @@ async function _receiveReply(req, res) {
     if (tenant) {
       instantlyApiKey = tenant.credentials?.instantlyApiKey || instantlyApiKey;
       googleSheetId   = tenant.googleSheetId || '';
-      console.log(`  [tenant] found slug="${tenantSlug}" apiKey=${instantlyApiKey ? 'set' : 'missing'}`);
+      console.log(`${p} [tenant] found slug="${tenantSlug}" apiKey=${instantlyApiKey ? 'set' : 'missing'}`);
     } else {
-      console.log(`  [tenant] not found slug="${tenantSlug}" — using env INSTANTLY_API_KEY (${instantlyApiKey ? 'set' : 'missing'})`);
+      console.log(`${p} [tenant] not found slug="${tenantSlug}" — using env INSTANTLY_API_KEY (${instantlyApiKey ? 'set' : 'missing'})`);
     }
   } catch (err) {
-    console.warn(`  [tenant] lookup error: ${err.message} — using env fallback`);
+    console.warn(`${p} [tenant] lookup error: ${err.message} — using env fallback`);
   }
 
   if (!instantlyApiKey) {
-    console.error(`  [500] no Instantly API key — set INSTANTLY_API_KEY in .env or add tenant "${meta.tenantName}" to MongoDB`);
-    return res.status(500).json({ success: false, error: 'No Instantly API key available' });
+    console.error(`${p} [500] no Instantly API key — set INSTANTLY_API_KEY in .env or add tenant "${meta.tenantName}" to MongoDB`);
+    return { success: false, status: 500, error: 'No Instantly API key available' };
   }
 
-  // Send (or log in test mode)
   if (TEST_MODE) {
-    console.log('  [TEST MODE] would send via Instantly:');
+    console.log(`${p} [TEST MODE] would send via Instantly:`);
     console.log(`    eaccount:      ${email_account}`);
     console.log(`    reply_to_uuid: ${email_id}`);
     console.log(`    subject:       ${reply_subject}`);
@@ -141,15 +167,14 @@ async function _receiveReply(req, res) {
         bodyHtml,
         bodyText:    plainText,
       });
-      console.log(`  [ok] reply sent via Instantly`);
+      console.log(`${p} [ok] reply sent via Instantly`);
     } catch (err) {
       const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
-      console.error(`  [500] Instantly API error — status=${err.response?.status ?? 'no response'} detail=${detail}`);
-      return res.status(500).json({ success: false, error: `Instantly API error: ${detail}` });
+      console.error(`${p} [500] Instantly API error — status=${err.response?.status ?? 'no response'} detail=${detail}`);
+      return { success: false, status: 500, error: `Instantly API error: ${detail}` };
     }
   }
 
-  // Record the sent auto-reply so follow-up tracking can thread responses
   try {
     const existing = await AutoReplyRecord.findOne({ lead_email, campaign_id, isResolved: false });
     if (!existing) {
@@ -168,5 +193,5 @@ async function _receiveReply(req, res) {
     // Non-fatal
   }
 
-  return res.status(200).json({ success: true });
+  return { success: true, status: 200 };
 }
